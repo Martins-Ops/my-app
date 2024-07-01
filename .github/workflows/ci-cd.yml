@@ -1,3 +1,72 @@
+# name: CI/CD Pipeline
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v2
+
+#     - name: Set up Node.js
+#       uses: actions/setup-node@v2
+#       with:
+#         node-version: '14'
+
+#     - name: Install dependencies
+#       run: npm install
+
+#     # - name: Run tests
+#     #   run: npm test
+
+#     - name: Archive production artifacts
+#       run: zip -r my-app.zip .
+#       shell: bash
+
+#     - name: Upload artifact
+#       uses: actions/upload-artifact@v2
+#       with:
+#         name: my-app
+#         path: my-app.zip
+
+#   deploy:
+#     needs: build
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - name: Download artifact
+#       uses: actions/download-artifact@v2
+#       with:
+#         name: my-app
+#         path: my-app.zip
+
+#     - name: Copy files via SSH
+#       uses: appleboy/scp-action@v0.1.0
+#       with:
+#         host: ${{ secrets.EC2_HOST }}
+#         username: ${{ secrets.EC2_USER }}
+#         key: ${{ secrets.EC2_KEY }}
+#         source: "my-app.zip"
+#         target: "~/"
+
+#     - name: Deploy application via SSH
+#       uses: appleboy/ssh-action@v0.1.0
+#       with:
+#         host: ${{ secrets.EC2_HOST }}
+#         username: ${{ secrets.EC2_USER }}
+#         key: ${{ secrets.EC2_KEY }}
+#         script: |
+#           sudo apt-get update
+#           sudo apt-get install -y unzip
+#           unzip -o ~/my-app.zip -d ~/my-app
+#           cd ~/my-app
+#           npm install --production
+#           pm2 restart my-app || pm2 start app.js --name my-app
 name: CI/CD Pipeline
 
 on:
@@ -10,60 +79,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '14'
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    # - name: Run tests
-    #   run: npm test
+      # - name: Run tests
+      #   run: npm test
 
-    - name: Archive production artifacts
-      run: zip -r my-app.zip .
-      shell: bash
+      - name: Create tarball
+        run: tar -cvf /tmp/my-app.tar ./
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: my-app
-        path: my-app.zip
+      - name: Copy file to server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$EC2_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa /tmp/my-app.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: my-app
-        path: my-app.zip
-
-    - name: Copy files via SSH
-      uses: appleboy/scp-action@v0.1.0
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_KEY }}
-        source: "my-app.zip"
-        target: "~/"
-
-    - name: Deploy application via SSH
-      uses: appleboy/ssh-action@v0.1.0
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_KEY }}
-        script: |
-          sudo apt-get update
-          sudo apt-get install -y unzip
-          unzip -o ~/my-app.zip -d ~/my-app
-          cd ~/my-app
-          npm install --production
-          pm2 restart my-app || pm2 start app.js --name my-app
+      - name: Deploy application
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_KEY }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}<< 'EOF'
+          cd /tmp/
+          tar -xvf my-app.tar
+          # Add your deployment commands here, for example:
+          # npm install --production
+          # pm2 restart all
+          EOF
