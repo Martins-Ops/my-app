@@ -115,7 +115,8 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: my-app-tarball
-
+          path: my-app.tar
+          
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
@@ -124,7 +125,7 @@ jobs:
 
       - name: Copy file to server
         run: |
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa /tmp/my-app.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa my-app.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
           
       - name: Deploy application
         run: |
