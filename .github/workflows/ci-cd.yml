@@ -125,7 +125,7 @@ jobs:
 
       - name: Copy file to server
         run: |
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa /tmp/my-app.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa /tmp/*.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
           
       - name: Deploy application
         run: |
