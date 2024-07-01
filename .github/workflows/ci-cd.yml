@@ -67,6 +67,7 @@
 #           cd ~/my-app
 #           npm install --production
 #           pm2 restart my-app || pm2 start app.js --name my-app
+
 name: CI/CD Pipeline
 
 on:
@@ -90,24 +91,42 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # - name: Run tests
-      #   run: npm test
+      - name: Run tests
+        run: npm test
 
       - name: Create tarball
-        run: tar -cvf /tmp/my-app.tar ./
+        run: tar -cvf my-app.tar ./
 
-      - name: Copy file to server
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.EC2_KEY }}
+      - name: Upload tarball
+        uses: actions/upload-artifact@v2
+        with:
+          name: my-app-tarball
+          path: my-app.tar
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Download tarball
+        uses: actions/download-artifact@v2
+        with:
+          name: my-app-tarball
+
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "$EC2_KEY" > ~/.ssh/id_rsa
+          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa /tmp/my-app.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
 
+      - name: Copy file to server
+        run: |
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa /tmp/my-app.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+          
       - name: Deploy application
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.EC2_KEY }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}<< 'EOF'
           cd /tmp/
@@ -116,3 +135,5 @@ jobs:
           # npm install --production
           # pm2 restart all
           EOF
+
+  
